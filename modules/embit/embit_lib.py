@@ -50,6 +50,11 @@ def is_satisfiable(ms: Miniscript) -> bool:
     return results[id(ms)]
 
 
+def has_uncompressed_key(ms: Miniscript) -> bool:
+    # Keys without a compressed flag, such as extended keys, are compressed.
+    return any(not getattr(key.key, "compressed", True) for key in ms.keys)
+
+
 def miniscript_parse(data: bytes) -> bool:
     try:
         text = data.decode()
@@ -77,6 +82,12 @@ def descriptor_parse(data: bytes) -> BfResult:
             # not, so inputs like wsh(u:1) can still differ from Core.
             # TODO: remove once Embit implements the sanity checks itself:
             # https://github.com/diybitcoinhardware/embit/issues/144
+            return skip()
+        # Core only allows uncompressed keys at the top level and directly
+        # under sh(), so it rejects them anywhere inside wsh() and sh(wsh()).
+        # TODO: remove once Embit rejects these keys itself:
+        # https://github.com/diybitcoinhardware/embit/pull/179
+        if desc.wsh and has_uncompressed_key(desc.miniscript):
             return skip()
         return ok("1")
     except Exception:
